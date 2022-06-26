@@ -2210,12 +2210,14 @@ class Decoder(nn.Module):
     @eval_decorator
     def sample(
         self,
+        image = None,
         image_embed = None,
         text = None,
         text_mask = None,
         text_encodings = None,
         batch_size = 1,
         cond_scale = 1.,
+        start_at_unet_number = 1,
         stop_at_unet_number = None,
         distributed = False,
     ):
@@ -2232,11 +2234,20 @@ class Decoder(nn.Module):
         assert not (not self.condition_on_text_encodings and exists(text_encodings)), 'decoder specified not to be conditioned on text, yet it is presented'
 
         img = None
+        if start_at_unet_number > 1:
+            # Then we are not generating the first image and one must have been passed in
+            assert exists(image), 'image must be passed in if starting at unet number > 1'
+            assert image.shape[0] == batch_size, 'image must have batch size of {} if starting at unet number > 1'.format(batch_size)
+            img = image
         is_cuda = next(self.parameters()).is_cuda
 
         for unet_number, unet, vae, channel, image_size, predict_x_start, learned_variance, noise_scheduler in tqdm(zip(range(1, len(self.unets) + 1), self.unets, self.vaes, self.sample_channels, self.image_sizes, self.predict_x_start, self.learned_variance, self.noise_schedulers)):
+            if unet_number < start_at_unet_number:
+                continue  # It's the easiest way to do it
 
-            context = self.one_unet_in_gpu(unet = unet) if is_cuda and not distributed else null_context()
+            # context = self.one_unet_in_gpu(unet = unet) if is_cuda and not distributed else null_context()
+            context = self.one_unet_in_gpu(unet = unet) if is_cuda else null_context()
+            # context = self.one_unet_in_gpu(unet = unet)
 
             with context:
                 lowres_cond_img = None
@@ -2251,6 +2262,7 @@ class Decoder(nn.Module):
 
                 lowres_cond_img = maybe(vae.encode)(lowres_cond_img)
 
+                # unet_device = next(unet.parameters()).device
                 img = self.p_sample_loop(
                     unet,
                     shape,
