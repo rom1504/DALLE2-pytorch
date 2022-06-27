@@ -75,6 +75,8 @@ def cast_tuple(val, length = None):
     return out
 
 def module_device(module):
+    if isinstance(module, nn.Identity):
+        return 'cpu' # It doesn't matter
     return next(module.parameters()).device
 
 @contextmanager

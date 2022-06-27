@@ -272,6 +272,7 @@ def train(
     evaluate_config=None,
     epoch_samples = None,  # If the training dataset is resampling, we have to manually stop an epoch
     validation_samples = None,
+    save_immediately=False,
     epochs = 20,
     n_sample_images = 5,
     save_every_n_samples = 100000,
@@ -413,7 +414,7 @@ def train(
                     if is_master:
                         tracker.log(log_data, step=step())
 
-                if is_master and last_snapshot + save_every_n_samples < sample:  # This will miss by some amount every time, but it's not a big deal... I hope
+                if is_master and (last_snapshot + save_every_n_samples < sample or (save_immediately and i == 0)):  # This will miss by some amount every time, but it's not a big deal... I hope
                     # It is difficult to gather this kind of info on the accelerator, so we have to do it on the master
                     print("Saving snapshot")
                     last_snapshot = sample

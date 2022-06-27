@@ -301,6 +301,7 @@ class DecoderTrainConfig(BaseModel):
     device: str = 'cuda:0'
     epoch_samples: int = None                      # Limits the number of samples per epoch. None means no limit. Required if resample_train is true as otherwise the number of samples per epoch is infinite.
     validation_samples: int = None                 # Same as above but for validation.
+    save_immediately: bool = False
     use_ema: bool = True
     ema_beta: float = 0.999
     amp: bool = False

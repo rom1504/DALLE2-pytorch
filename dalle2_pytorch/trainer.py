@@ -481,16 +481,18 @@ class DecoderTrainer(nn.Module):
         warmup_schedulers = []
 
         for unet, unet_lr, unet_wd, unet_eps, unet_warmup_steps in zip(decoder.unets, lr, wd, eps, warmup_steps):
-            optimizer = get_optimizer(
-                unet.parameters(),
-                lr = unet_lr,
-                wd = unet_wd,
-                eps = unet_eps,
-                group_wd_params = group_wd_params,
-                **kwargs
-            )
-
-            optimizers.append(optimizer)
+            if isinstance(unet, nn.Identity):
+                optimizers.append(None)
+            else:
+                optimizer = get_optimizer(
+                    unet.parameters(),
+                    lr = unet_lr,
+                    wd = unet_wd,
+                    eps = unet_eps,
+                    group_wd_params = group_wd_params,
+                    **kwargs
+                )
+                optimizers.append(optimizer)
 
             scheduler = LambdaLR(optimizer, lr_lambda = lambda step: 1.0)
 
@@ -542,7 +544,8 @@ class DecoderTrainer(nn.Module):
         for ind in range(0, self.num_unets):
             optimizer_key = f'optim{ind}'
             optimizer = getattr(self, optimizer_key)
-            save_obj = {**save_obj, optimizer_key: self.accelerator.unwrap_model(optimizer).state_dict()}
+            state_dict = optimizer.state_dict() if optimizer is not None else None
+            save_obj = {**save_obj, optimizer_key: state_dict}
 
         if self.use_ema:
             save_obj = {**save_obj, 'ema': self.ema_unets.state_dict()}
@@ -564,8 +567,9 @@ class DecoderTrainer(nn.Module):
             optimizer_key = f'optim{ind}'
             optimizer = getattr(self, optimizer_key)
             warmup_scheduler = self.warmup_schedulers[ind]
-
-            self.accelerator.unwrap_model(optimizer).load_state_dict(loaded_obj[optimizer_key])
+            
+            if optimizer is not None:
+                self.accelerator.unwrap_model(optimizer).load_state_dict(loaded_obj[optimizer_key])
 
             if exists(warmup_scheduler):
                 warmup_scheduler.last_step = last_step
