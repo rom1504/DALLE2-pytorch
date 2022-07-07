@@ -483,6 +483,7 @@ class DecoderTrainer(nn.Module):
         for unet, unet_lr, unet_wd, unet_eps, unet_warmup_steps in zip(decoder.unets, lr, wd, eps, warmup_steps):
             if isinstance(unet, nn.Identity):
                 optimizers.append(None)
+                continue
             else:
                 optimizer = get_optimizer(
                     unet.parameters(),
@@ -511,7 +512,6 @@ class DecoderTrainer(nn.Module):
         self.register_buffer('steps', torch.tensor([0] * self.num_unets))
 
         decoder, *optimizers = list(self.accelerator.prepare(decoder, *optimizers))
-        schedulers = list(self.accelerator.prepare(*schedulers))
 
         self.decoder = decoder
 
@@ -522,8 +522,6 @@ class DecoderTrainer(nn.Module):
 
         # store schedulers
 
-        for sched_ind, scheduler in zip(range(len(schedulers)), schedulers):
-            setattr(self, f'sched{sched_ind}', scheduler)
 
         # store warmup schedulers
 

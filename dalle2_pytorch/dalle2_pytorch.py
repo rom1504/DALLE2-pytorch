@@ -2018,14 +2018,12 @@ class Decoder(nn.Module):
         # device tracker
 
         self.register_buffer('_dummy', torch.Tensor([True]), persistent = False)
+        self.condition_on_text_encodings = any([unet.cond_on_text_encodings for unet in self.unets])
 
     @property
     def device(self):
         return self._dummy.device
 
-    @property
-    def condition_on_text_encodings(self):
-        return any([unet.cond_on_text_encodings for unet in self.unets])
 
     def get_unet(self, unet_number):
         assert 0 < unet_number <= len(self.unets)
