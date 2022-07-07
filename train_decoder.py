@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List
+from datetime import timedelta
 
 from dalle2_pytorch.trainer import DecoderTrainer
 from dalle2_pytorch.dataloaders import create_image_embedding_dataloader
@@ -16,7 +17,7 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 from torchmetrics.image.inception import InceptionScore
 from torchmetrics.image.kid import KernelInceptionDistance
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
-from accelerate import Accelerator, DistributedDataParallelKwargs
+from accelerate import Accelerator, DistributedDataParallelKwargs, InitProcessGroupKwargs
 from accelerate.utils import dataclasses as accelerate_dataclasses
 import webdataset as wds
 import click
@@ -544,7 +545,8 @@ def initialize_training(config: TrainDecoderConfig, config_path):
 
     # Set up accelerator for configurable distributed training
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=config.train.find_unused_parameters)
-    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
+    init_kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=60*60))
+    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs, init_kwargs])
     
     # Set up data
     all_shards = list(range(config.data.start_shard, config.data.end_shard + 1))
@@ -595,10 +597,11 @@ def initialize_training(config: TrainDecoderConfig, config_path):
 
     accelerator.print(print_ribbon("Loaded Config", repeat=40))
     accelerator.print(f"Running training with {accelerator.num_processes} processes and {accelerator.distributed_type} distributed training")
-    accelerator.print(f"Training using {data_source_string}. {'conditioned on text' if conditioning_on_text else 'not conditioned on text'}")
+    accelerator.print(f"Training using {data_source_string}. {'Conditioned on text' if conditioning_on_text else 'Not conditioned on text'}")
     accelerator.print(f"Number of parameters: {num_parameters}")
     for i, unet in enumerate(decoder.unets):
         accelerator.print(f"Unet {i} has {sum(p.numel() for p in unet.parameters())} parameters")
+
     train(dataloaders, decoder, accelerator,
         tracker=tracker,
         inference_device=accelerator.device,
